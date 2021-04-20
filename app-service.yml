@@ -1,0 +1,43 @@
+trigger:
+- main
+- master
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  azureSubscription: { azureSubscription }
+  appName: { appName }
+  buildConfiguration: 'Release'
+  major: 1
+  minor: 0
+  patch: $[counter(format('{0}.{1}', variables['major'], variables['minor']), 0)]
+  version: $[format('{0}.{1}.{2}', variables['major'], variables['minor'], variables['patch'])]
+
+name: $(appName) $(version)
+
+steps:
+  - script: dotnet restore
+    displayName: dotnet restore
+
+  - script: dotnet build --configuration $(buildConfiguration) --no-restore
+    displayName: 'dotnet build $(buildConfiguration)'
+
+  - script: dotnet test --configuration $(buildConfiguration) --no-restore -- no-build
+    displayName: 'dotnet test'
+
+  - task: DotNetCoreCLI@2
+    displayName: dotnet publish
+    inputs:
+      command: 'publish'
+      publishWebProjects: True
+      arguments: '--configuration $(BuildConfiguration) --output $(Build.ArtifactStagingDirectory) --no-restore --no-build'
+      zipAfterPublish: True
+
+  - task: AzureWebApp@1
+    displayName: 'Azure Web App Deploy'
+    inputs:
+      azureSubscription: $(azureSubscription)
+      appType: webAppLinux
+      appName: $(appName)
+      package: $(Build.ArtifactStagingDirectory)/**/*.zip
