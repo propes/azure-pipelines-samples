@@ -1,0 +1,64 @@
+# Sets up an Azure App Service instance by deploying an arm template using Azure CLI.
+
+trigger:
+- main
+- master
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  buildConfiguration: 'Release'
+  azureSubscription: 'Pay-As-You-Go(f53c660c-a5f9-4d77-af0c-b52fa735610a)'
+  armTemplateName: 'azure-deploy.json'
+  resourceGroupName: 'rg-test-shared-uks'
+  resourceGroupLocation: 'uksouth'
+  appPlanName: 'coolbananas'
+  appName: 'coolbananas-123'
+
+steps:
+- task: CmdLine@2
+  displayName: 'Download arm template'
+  inputs:
+    script: 'wget https://raw.githubusercontent.com/propes/arm-template-samples/main/app-service.json -O $(armTemplateName)'
+
+- task: AzureCLI@2
+  displayName: 'Create resource group'
+  inputs:
+    azureSubscription: $(azureSubscription)
+    scriptType: 'bash'
+    scriptLocation: 'inlineScript'
+    inlineScript: 'az group create --name $(resourceGroupName) --location $(resourceGroupLocation)'
+
+- task: AzureCLI@2
+  displayName: 'Deploy arm template'
+  inputs:
+    azureSubscription: $(azureSubscription)
+    scriptType: 'bash'
+    scriptLocation: 'inlineScript'
+    inlineScript: 'az deployment group create --name initialdeploy --template-file $(armTemplateName) --resource-group $(resourceGroupName) --parameters appPlanName=$(appPlanName) appName=$(appName)'
+
+- script: dotnet restore
+  displayName: dotnet restore
+
+- script: dotnet build --configuration $(buildConfiguration) --no-restore
+  displayName: 'dotnet build $(buildConfiguration)'
+
+- script: dotnet test --configuration $(buildConfiguration) --no-restore -- no-build
+  displayName: 'dotnet test'
+
+- task: DotNetCoreCLI@2
+  displayName: dotnet publish
+  inputs:
+    command: 'publish'
+    publishWebProjects: True
+    arguments: '--configuration $(BuildConfiguration) --output $(Build.ArtifactStagingDirectory) --no-restore --no-build'
+    zipAfterPublish: True
+
+- task: AzureWebApp@1
+  displayName: 'Azure Web App Deploy'
+  inputs:
+    azureSubscription: $(azureSubscription)
+    appType: webAppLinux
+    appName: $(appName)
+    package: $(Build.ArtifactStagingDirectory)/**/*.zip
