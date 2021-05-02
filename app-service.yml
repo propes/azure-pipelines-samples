@@ -17,27 +17,27 @@ variables:
 name: $(appName) $(version)
 
 steps:
-  - script: dotnet restore
-    displayName: dotnet restore
+- script: dotnet restore
+  displayName: dotnet restore
 
-  - script: dotnet build --configuration $(buildConfiguration) --no-restore
-    displayName: 'dotnet build $(buildConfiguration)'
+- script: dotnet build --configuration $(buildConfiguration) --no-restore
+  displayName: 'dotnet build $(buildConfiguration)'
 
-  - script: dotnet test --configuration $(buildConfiguration) --no-restore -- no-build
-    displayName: 'dotnet test'
+- script: dotnet test --configuration $(buildConfiguration) --no-restore -- no-build
+  displayName: 'dotnet test'
 
-  - task: DotNetCoreCLI@2
-    displayName: dotnet publish
-    inputs:
-      command: 'publish'
-      publishWebProjects: True
-      arguments: '--configuration $(BuildConfiguration) --output $(Build.ArtifactStagingDirectory) --no-restore --no-build'
-      zipAfterPublish: True
+- task: DotNetCoreCLI@2
+  displayName: dotnet publish
+  inputs:
+    command: 'publish'
+    publishWebProjects: True
+    arguments: '--configuration $(BuildConfiguration) --output $(Build.ArtifactStagingDirectory) --no-restore --no-build'
+    zipAfterPublish: True
 
-  - task: AzureWebApp@1
-    displayName: 'Azure Web App Deploy'
-    inputs:
-      azureSubscription: $(azureSubscription)
-      appType: webAppLinux
-      appName: $(appName)
-      package: $(Build.ArtifactStagingDirectory)/**/*.zip
+- task: AzureWebApp@1
+  displayName: 'Azure Web App Deploy'
+  inputs:
+    azureSubscription: $(azureSubscription)
+    appType: webAppLinux
+    appName: $(appName)
+    package: $(Build.ArtifactStagingDirectory)/**/*.zip
