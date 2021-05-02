@@ -1,0 +1,52 @@
+# Sets up an Azure App Service instance using Azure CLI then builds and deploys to it.
+
+trigger:
+- main
+- master
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  buildConfiguration: 'Release'
+  azureSubscription: { azureSubscription }
+  appName: { appName }
+
+steps:
+- task: CmdLine@2
+  displayName: 'Download infra setup script'
+  inputs:
+    script: 'wget https://raw.githubusercontent.com/propes/azure-cli-scripts/main/app-service.sh -O azure-deploy.sh'
+
+- task: AzureCLI@2
+  displayName: 'Run infra script'
+  inputs:
+    azureSubscription: $(azureSubscription)
+    scriptType: 'bash'
+    scriptLocation: 'scriptPath'
+    scriptPath: './azure-deploy.sh'
+
+- script: dotnet restore
+  displayName: dotnet restore
+
+- script: dotnet build --configuration $(buildConfiguration) --no-restore
+  displayName: 'dotnet build $(buildConfiguration)'
+
+- script: dotnet test --configuration $(buildConfiguration) --no-restore -- no-build
+  displayName: 'dotnet test'
+
+- task: DotNetCoreCLI@2
+  displayName: dotnet publish
+  inputs:
+    command: 'publish'
+    publishWebProjects: True
+    arguments: '--configuration $(BuildConfiguration) --output $(Build.ArtifactStagingDirectory) --no-restore --no-build'
+    zipAfterPublish: True
+
+- task: AzureWebApp@1
+  displayName: 'Azure Web App Deploy'
+  inputs:
+    azureSubscription: $(azureSubscription)
+    appType: webAppLinux
+    appName: $(appName)
+    package: $(Build.ArtifactStagingDirectory)/**/*.zip
